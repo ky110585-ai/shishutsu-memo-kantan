@@ -1,0 +1,270 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>かんたん支出メモ</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  font-family: sans-serif;
+  background: #f3f5f8;
+  color: #222;
+  margin: 0;
+  padding: 20px 14px;
+}
+main { max-width: 520px; margin: auto; }
+h1 { font-size: 26px; }
+.panel {
+  background: white;
+  padding: 18px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px #0000000a;
+}
+label {
+  display: block;
+  margin: 14px 0 6px;
+  font-weight: bold;
+}
+input, select, button {
+  font: inherit;
+  padding: 12px;
+  border-radius: 9px;
+}
+input, select {
+  width: 100%;
+  border: 1px solid #ccd2dc;
+  background: white;
+}
+.tax-options { display: flex; gap: 10px; }
+.tax-options label {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ccd2dc;
+  border-radius: 9px;
+  margin: 0;
+}
+.tax-options input { width: auto; }
+.result {
+  background: #edf4ff;
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 14px;
+}
+.result p { margin: 6px 0; }
+.result strong { font-size: 20px; }
+button {
+  border: 0;
+  cursor: pointer;
+}
+.add {
+  width: 100%;
+  background: #2563eb;
+  color: white;
+  margin-top: 18px;
+  font-weight: bold;
+}
+.total { font-size: 26px; font-weight: bold; }
+.record {
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.record small { display: block; color: #666; margin-top: 5px; }
+.delete { background: #eee; padding: 6px 10px; margin-top: 5px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>📝 かんたん支出メモ</h1>
+  <p>毎日の支出を簡単に記録しよう。</p>
+
+  <section class="panel">
+    <h2>支出を記録</h2>
+
+    <label for="amount">金額（税抜・円）</label>
+    <input id="amount" type="number" min="1"
+           step="1" placeholder="例：1000">
+
+    <label>消費税率</label>
+    <div class="tax-options">
+      <label><input type="radio" name="tax" value="0.08"> 8%</label>
+      <label><input type="radio" name="tax" value="0.10" checked> 10%</label>
+    </div>
+
+    <div class="result">
+      <p>消費税額：<strong id="taxAmount">0円</strong></p>
+      <p>税込金額：<strong id="grossAmount">0円</strong></p>
+    </div>
+
+    <label for="category">カテゴリ</label>
+    <select id="category">
+      <option>食費</option>
+      <option>日用品</option>
+      <option>交通費</option>
+      <option>光熱費</option>
+      <option>通信費</option>
+      <option>娯楽</option>
+      <option>その他</option>
+    </select>
+
+    <label for="date">日付</label>
+    <input id="date" type="date">
+
+    <label for="memo">メモ（任意）</label>
+    <input id="memo" type="text" maxlength="80"
+           placeholder="例：スーパーで買い物">
+
+    <button class="add" id="add">支出を追加</button>
+  </section>
+
+  <section class="panel">
+    <h2>支出合計（税込）</h2>
+    <div class="total" id="total">0円</div>
+    <p id="count">0件の記録</p>
+  </section>
+
+  <section class="panel">
+    <h2>支出一覧</h2>
+    <div id="records">まだ記録はありません。</div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const yen = n => Math.round(n).toLocaleString("ja-JP") + "円";
+
+function getRate() {
+  return Number(document.querySelector(
+    'input[name="tax"]:checked'
+  ).value);
+}
+
+function calculate() {
+  const amount = Math.max(0, Math.floor(Number($("amount").value) || 0));
+  const tax = Math.floor(amount * getRate());
+  $("taxAmount").textContent = yen(tax);
+  $("grossAmount").textContent = yen(amount + tax);
+}
+
+document.querySelectorAll('input[name="tax"]').forEach(el => {
+  el.addEventListener("change", calculate);
+});
+$("amount").addEventListener("input", calculate);
+
+const today = new Date();
+$("date").value =
+  today.getFullYear() + "-" +
+  String(today.getMonth() + 1).padStart(2, "0") + "-" +
+  String(today.getDate()).padStart(2, "0");
+
+let records = [];
+try {
+  records = JSON.parse(
+    localStorage.getItem("kantanShishutsuRecords") || "[]"
+  );
+  if (!Array.isArray(records)) records = [];
+} catch {
+  records = [];
+}
+
+function save() {
+  localStorage.setItem(
+    "kantanShishutsuRecords", JSON.stringify(records)
+  );
+}
+
+function render() {
+  $("total").textContent = yen(
+    records.reduce((sum, r) => sum + r.gross, 0)
+  );
+  $("count").textContent = records.length + "件の記録";
+
+  const root = $("records");
+  root.replaceChildren();
+
+  if (records.length === 0) {
+    root.textContent = "まだ記録はありません。";
+    return;
+  }
+
+  [...records].reverse().forEach(r => {
+    const item = document.createElement("div");
+    item.className = "record";
+
+    const info = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = r.category;
+
+    const detail = document.createElement("small");
+    detail.textContent =
+      r.date + " ・ 税率" + Math.round(r.rate * 100) + "%" +
+      (r.memo ? " ・ " + r.memo : "");
+
+    info.append(name, detail);
+
+    const right = document.createElement("div");
+    right.style.textAlign = "right";
+    right.style.whiteSpace = "nowrap";
+    right.append(document.createTextNode(yen(r.gross)));
+
+    const del = document.createElement("button");
+    del.className = "delete";
+    del.textContent = "削除";
+    del.addEventListener("click", () => {
+      records = records.filter(x => x.id !== r.id);
+      save();
+      render();
+    });
+
+    right.append(document.createElement("br"), del);
+    item.append(info, right);
+    root.append(item);
+  });
+}
+
+$("add").addEventListener("click", () => {
+  const amount = Number($("amount").value);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    alert("1円以上の金額を入力してください。");
+    $("amount").focus();
+    return;
+  }
+
+  const rate = getRate();
+  const net = Math.floor(amount);
+  const tax = Math.floor(net * rate);
+
+  records.push({
+    id: Date.now().toString() + Math.random(),
+    date: $("date").value,
+    category: $("category").value,
+    memo: $("memo").value.trim(),
+    rate,
+    gross: net + tax
+  });
+
+  try {
+    save();
+  } catch {
+    alert("保存できませんでした。ブラウザの保存領域を確認してください。");
+    records.pop();
+    return;
+  }
+
+  render();
+  $("amount").value = "";
+  $("memo").value = "";
+  calculate();
+});
+
+render();
+calculate();
+</script>
+</body>
+</html>
