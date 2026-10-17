@@ -230,8 +230,8 @@ function render() {
 $("add").addEventListener("click", () => {
   const amount = Number($("amount").value);
 
-  if (!Number.isFinite(amount) || amount <= 0) {
-    alert("1円以上の金額を入力してください。");
+   if (!Number.isSafeInteger(amount) || amount < 1) {
+    alert("1円以上の整数を入力してください。");
     $("amount").focus();
     return;
   }
